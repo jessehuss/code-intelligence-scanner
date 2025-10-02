@@ -1,50 +1,46 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+- Version change: 2.1.1 → 1.0.0 (new constitution for cataloger project)
+- Modified principles: All principles replaced with cataloger-specific ones
+- Added sections: Security & Privacy, Observability, Quality Gates, Developer Experience, Schedules
+- Removed sections: None (template structure preserved)
+- Templates requiring updates: ✅ plan-template.md, ✅ spec-template.md, ✅ tasks-template.md
+- Follow-up TODOs: None
+-->
+
+# Cataloger Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Technology Stack Constraints
+MUST use .NET 8 + C# for backend services; MongoDB.Driver for all data access operations; Roslyn for static analysis capabilities; Next.js (TypeScript) for UI components; ASP.NET Core Minimal APIs for backend endpoints. No deviations from this stack without explicit constitutional amendment.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Security & Privacy (NON-NEGOTIABLE)
+MUST use read-only MongoDB credentials for sampling operations; MUST redact PII in any stored examples; MUST allow only shape/type/length/format in samples - no actual data content. All data access patterns must be auditable and reversible.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Observability (NON-NEGOTIABLE)
+MUST log provenance for every extracted fact: repository, file path, symbol name, commit SHA, and timestamp. All logging must be structured and searchable. No fact extraction without complete provenance tracking.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Quality Gates
+MUST have unit tests for resolvers (collection name inference, filter extraction); MUST have integration tests against a seeded MongoDB instance; MUST validate all data access patterns before production deployment.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Developer Experience
+MUST provide deep links to Git (file + line references); MUST provide "copy as" helpers for Mongo shell and Builders<T> examples; MUST maintain clear documentation for all data access patterns and resolvers.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Security & Privacy Requirements
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+All data sampling operations MUST use read-only credentials. PII redaction is mandatory for any stored examples. Only structural information (shape, type, length, format) may be preserved in samples. All data access must be auditable with complete provenance tracking.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+### Schedules
+MUST perform incremental scan on every push; MUST perform nightly full scan; MUST perform weekly integrity checks. All scans must be automated and report results to the development team.
+
+### Code Review Process
+All PRs MUST verify compliance with security constraints, observability requirements, and quality gates. Complexity must be justified against the core principles. Use constitution.md for runtime development guidance.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This constitution supersedes all other development practices. Amendments require documentation, approval from the development team, and a migration plan for existing code. All development work must comply with these principles.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2025-01-27 | **Last Amended**: 2025-01-27

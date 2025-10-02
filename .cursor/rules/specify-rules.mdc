@@ -1,0 +1,27 @@
+﻿# cataloger Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-10-02
+
+## Active Technologies
+- .NET 8, C# 12 + Microsoft.CodeAnalysis.* (Roslyn), MongoDB.Driver, Microsoft.Extensions.* (001-feature-f001-code)
+- .NET 8 + C# + ASP.NET Core Minimal APIs, MongoDB.Driver, Atlas Search, Redis (002-feature-f002-catalog)
+- MongoDB "catalog_kb" database, Atlas Search for text queries, Redis for caching (002-feature-f002-catalog)
+
+## Project Structure
+```
+src/
+tests/
+```
+
+## Commands
+# Add commands for .NET 8, C# 12
+
+## Code Style
+.NET 8, C# 12: Follow standard conventions
+
+## Recent Changes
+- 002-feature-f002-catalog: Added .NET 8 + C# + ASP.NET Core Minimal APIs, MongoDB.Driver, Atlas Search, Redis
+- 001-feature-f001-code: Added .NET 8, C# 12 + Microsoft.CodeAnalysis.* (Roslyn), MongoDB.Driver, Microsoft.Extensions.*
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->

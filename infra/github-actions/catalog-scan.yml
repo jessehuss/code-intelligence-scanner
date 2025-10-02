@@ -1,0 +1,574 @@
+name: Code Intelligence Scanner & Knowledge Base Seeder
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/scanner/**'
+      - 'specs/**'
+      - '.github/workflows/catalog-scan.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/scanner/**'
+      - 'specs/**'
+      - '.github/workflows/catalog-scan.yml'
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of scan to perform'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+          - full
+          - incremental
+          - integrity
+      repositories:
+        description: 'Comma-separated list of repositories to scan'
+        required: false
+        type: string
+      environment:
+        description: 'Environment to scan'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - staging
+          - production
+
+env:
+  DOTNET_VERSION: '8.0.x'
+  MONGODB_VERSION: '7.0'
+  NODE_VERSION: '18.x'
+
+jobs:
+  # Job 1: Code Quality and Testing
+  code-quality:
+    name: Code Quality and Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore apps/scanner/src/Scanner.csproj
+
+    - name: Build solution
+      run: dotnet build apps/scanner/src/Scanner.csproj --configuration Release --no-restore
+
+    - name: Run unit tests
+      run: dotnet test apps/scanner/tests/ --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+
+    - name: Run integration tests
+      run: dotnet test apps/scanner/tests/integration/ --configuration Release --no-build --verbosity normal
+
+    - name: Run performance tests
+      run: dotnet test apps/scanner/tests/performance/ --configuration Release --no-build --verbosity normal
+
+    - name: Code coverage report
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+    - name: Upload test results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: test-results
+        path: |
+          apps/scanner/tests/**/TestResults/
+          apps/scanner/tests/**/coverage.xml
+
+  # Job 2: Security Scanning
+  security-scan:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Run security scan
+      run: |
+        dotnet list apps/scanner/src/Scanner.csproj package --vulnerable --include-transitive
+        dotnet list apps/scanner/src/Scanner.csproj package --deprecated --include-transitive
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/init@v3
+      with:
+        languages: csharp
+
+    - name: Perform CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
+
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+  # Job 3: Build and Package
+  build-package:
+    name: Build and Package
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [code-quality, security-scan]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore dependencies
+      run: dotnet restore apps/scanner/src/Scanner.csproj
+
+    - name: Build solution
+      run: dotnet build apps/scanner/src/Scanner.csproj --configuration Release --no-restore
+
+    - name: Publish application
+      run: dotnet publish apps/scanner/src/Scanner.csproj --configuration Release --no-build --output ./publish
+
+    - name: Create deployment package
+      run: |
+        tar -czf scanner-deployment.tar.gz -C ./publish .
+        zip -r scanner-deployment.zip ./publish/*
+
+    - name: Upload deployment artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: deployment-package
+        path: |
+          scanner-deployment.tar.gz
+          scanner-deployment.zip
+
+  # Job 4: Docker Build
+  docker-build:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [code-quality, security-scan]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Build Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./apps/scanner
+        file: ./apps/scanner/Dockerfile
+        push: false
+        tags: |
+          cataloger-scanner:latest
+          cataloger-scanner:${{ github.sha }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+    - name: Run Trivy vulnerability scanner on image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: 'cataloger-scanner:latest'
+        format: 'sarif'
+        output: 'trivy-image-results.sarif'
+
+    - name: Upload Trivy image scan results
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: 'trivy-image-results.sarif'
+
+    - name: Save Docker image
+      run: docker save cataloger-scanner:latest | gzip > cataloger-scanner.tar.gz
+
+    - name: Upload Docker image
+      uses: actions/upload-artifact@v4
+      with:
+        name: docker-image
+        path: cataloger-scanner.tar.gz
+
+  # Job 5: Infrastructure Validation
+  infrastructure-validation:
+    name: Infrastructure Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [build-package]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Validate configuration files
+      run: |
+        # Validate appsettings.json
+        dotnet run --project apps/scanner/src/Scanner.csproj -- --validate-config
+        
+        # Validate Dockerfile
+        docker run --rm -i hadolint/hadolint < apps/scanner/Dockerfile
+
+    - name: Validate Kubernetes manifests
+      run: |
+        # Validate Kubernetes deployment manifests
+        kubectl --dry-run=client apply -f apps/scanner/k8s/
+
+    - name: Validate Helm charts
+      run: |
+        # Validate Helm charts
+        helm lint apps/scanner/helm/
+
+  # Job 6: Scanner Execution
+  scanner-execution:
+    name: Scanner Execution
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    needs: [build-package, infrastructure-validation]
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+
+    strategy:
+      matrix:
+        environment: [development, staging]
+        exclude:
+          - environment: production
+            when: github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup MongoDB
+      uses: supercharge/mongodb-github-action@1.12.0
+      with:
+        mongodb-version: ${{ env.MONGODB_VERSION }}
+
+    - name: Wait for MongoDB
+      run: |
+        until mongosh --eval "db.runCommand('ping')" > /dev/null 2>&1; do
+          echo "Waiting for MongoDB to start..."
+          sleep 2
+        done
+
+    - name: Create knowledge base
+      run: |
+        mongosh --eval "use catalog_kb; db.createCollection('code_types'); db.createCollection('collection_mappings'); db.createCollection('query_operations'); db.createCollection('data_relationships'); db.createCollection('observed_schemas'); db.createCollection('knowledge_base_entries');"
+
+    - name: Run scanner
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --scan-type ${{ github.event.inputs.scan_type || 'full' }} \
+          --repositories "${{ github.event.inputs.repositories || 'default' }}" \
+          --environment ${{ matrix.environment }} \
+          --output-format json \
+          --log-level Information
+
+    - name: Export scan results
+      run: |
+        # Export scan results to JSON
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --export-results \
+          --output-file scan-results-${{ matrix.environment }}.json \
+          --format json
+
+    - name: Upload scan results
+      uses: actions/upload-artifact@v4
+      with:
+        name: scan-results-${{ matrix.environment }}
+        path: |
+          scan-results-${{ matrix.environment }}.json
+          *.log
+
+  # Job 7: Knowledge Base Validation
+  knowledge-base-validation:
+    name: Knowledge Base Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [scanner-execution]
+    if: always() && needs.scanner-execution.result == 'success'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup MongoDB
+      uses: supercharge/mongodb-github-action@1.12.0
+      with:
+        mongodb-version: ${{ env.MONGODB_VERSION }}
+
+    - name: Wait for MongoDB
+      run: |
+        until mongosh --eval "db.runCommand('ping')" > /dev/null 2>&1; do
+          echo "Waiting for MongoDB to start..."
+          sleep 2
+        done
+
+    - name: Validate knowledge base
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --validate-knowledge-base \
+          --check-integrity \
+          --output-format json
+
+    - name: Generate knowledge base report
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --generate-report \
+          --report-type summary \
+          --output-file kb-report.json
+
+    - name: Upload knowledge base report
+      uses: actions/upload-artifact@v4
+      with:
+        name: knowledge-base-report
+        path: kb-report.json
+
+  # Job 8: Performance Testing
+  performance-testing:
+    name: Performance Testing
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    needs: [build-package]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Setup MongoDB
+      uses: supercharge/mongodb-github-action@1.12.0
+      with:
+        mongodb-version: ${{ env.MONGODB_VERSION }}
+
+    - name: Wait for MongoDB
+      run: |
+        until mongosh --eval "db.runCommand('ping')" > /dev/null 2>&1; do
+          echo "Waiting for MongoDB to start..."
+          sleep 2
+        done
+
+    - name: Run performance tests
+      run: |
+        dotnet test apps/scanner/tests/performance/ --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=performance-results.trx"
+
+    - name: Generate performance report
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --performance-test \
+          --test-duration 300 \
+          --concurrent-scans 5 \
+          --output-file performance-report.json
+
+    - name: Upload performance results
+      uses: actions/upload-artifact@v4
+      with:
+        name: performance-results
+        path: |
+          apps/scanner/tests/performance/TestResults/
+          performance-report.json
+
+  # Job 9: Documentation Generation
+  documentation:
+    name: Documentation Generation
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [build-package]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Generate API documentation
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --generate-docs \
+          --doc-type api \
+          --output-dir ./docs/api
+
+    - name: Generate user documentation
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --generate-docs \
+          --doc-type user \
+          --output-dir ./docs/user
+
+    - name: Generate architecture documentation
+      run: |
+        dotnet run --project apps/scanner/src/Scanner.csproj -- \
+          --generate-docs \
+          --doc-type architecture \
+          --output-dir ./docs/architecture
+
+    - name: Upload documentation
+      uses: actions/upload-artifact@v4
+      with:
+        name: documentation
+        path: ./docs/
+
+  # Job 10: Deployment
+  deployment:
+    name: Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [build-package, docker-build, knowledge-base-validation]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+
+    environment:
+      name: ${{ github.event.inputs.environment || 'development' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download deployment artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-package
+        path: ./artifacts
+
+    - name: Deploy to environment
+      id: deploy
+      run: |
+        # Deploy to target environment
+        echo "Deploying to ${{ github.event.inputs.environment || 'development' }}"
+        # Add actual deployment commands here
+        echo "url=https://scanner.${{ github.event.inputs.environment || 'development' }}.example.com" >> $GITHUB_OUTPUT
+
+    - name: Health check
+      run: |
+        # Wait for deployment to be ready
+        sleep 30
+        # Perform health check
+        curl -f ${{ steps.deploy.outputs.url }}/health || exit 1
+
+    - name: Notify deployment
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: 'Scanner deployment to ${{ github.event.inputs.environment || 'development' }}: ${{ job.status }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  # Job 11: Cleanup
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: [deployment]
+    if: always()
+
+    steps:
+    - name: Cleanup old artifacts
+      run: |
+        # Clean up old artifacts and temporary files
+        echo "Cleaning up old artifacts..."
+
+    - name: Cleanup Docker images
+      run: |
+        # Clean up Docker images
+        docker system prune -f
+
+    - name: Cleanup MongoDB
+      run: |
+        # Clean up MongoDB test data
+        echo "Cleaning up MongoDB test data..."
+
+  # Job 12: Notification
+  notification:
+    name: Notification
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [code-quality, security-scan, build-package, docker-build, infrastructure-validation, scanner-execution, knowledge-base-validation, performance-testing, documentation, deployment, cleanup]
+    if: always()
+
+    steps:
+    - name: Notify completion
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#scanner-ci'
+        text: 'Scanner CI/CD pipeline completed: ${{ job.status }}'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+    - name: Create GitHub release
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release v${{ github.run_number }}
+        body: |
+          Automated release from CI/CD pipeline
+          
+          ## Changes
+          - Scanner updates and improvements
+          - Performance optimizations
+          - Security enhancements
+          
+          ## Artifacts
+          - Deployment package
+          - Docker image
+          - Documentation
+        draft: false
+        prerelease: false

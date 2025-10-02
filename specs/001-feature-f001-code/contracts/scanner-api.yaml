@@ -1,0 +1,648 @@
+openapi: 3.0.3
+info:
+  title: Code Intelligence Scanner API
+  description: API for the Code Intelligence Scanner & Knowledge Base Seeder
+  version: 1.0.0
+  contact:
+    name: Cataloger Team
+    email: team@cataloger.dev
+
+servers:
+  - url: http://localhost:5000
+    description: Local development server
+  - url: https://api.cataloger.dev
+    description: Production server
+
+paths:
+  /api/v1/scanner/scan:
+    post:
+      summary: Start a new scan operation
+      description: Initiates a scan of one or more repositories for MongoDB usage patterns
+      operationId: startScan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScanRequest'
+      responses:
+        '202':
+          description: Scan operation started successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanResponse'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/scanner/status/{scanId}:
+    get:
+      summary: Get scan operation status
+      description: Retrieves the current status of a scan operation
+      operationId: getScanStatus
+      parameters:
+        - name: scanId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier for the scan operation
+      responses:
+        '200':
+          description: Scan status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScanStatusResponse'
+        '404':
+          description: Scan operation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/kb/search:
+    post:
+      summary: Search the knowledge base
+      description: Performs a text search across the knowledge base
+      operationId: searchKnowledgeBase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Search results retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid search parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/kb/types/{typeId}:
+    get:
+      summary: Get type information
+      description: Retrieves detailed information about a specific code type
+      operationId: getTypeInfo
+      parameters:
+        - name: typeId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Unique identifier for the code type
+      responses:
+        '200':
+          description: Type information retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TypeInfoResponse'
+        '404':
+          description: Type not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    ScanRequest:
+      type: object
+      required:
+        - repositories
+        - scanType
+      properties:
+        repositories:
+          type: array
+          items:
+            type: string
+          description: List of repository paths or URLs to scan
+        scanType:
+          type: string
+          enum: [full, incremental, integrity]
+          description: Type of scan to perform
+        enableSampling:
+          type: boolean
+          default: false
+          description: Whether to enable live MongoDB data sampling
+        samplingConfig:
+          $ref: '#/components/schemas/SamplingConfig'
+        outputFormat:
+          type: string
+          enum: [json, yaml, csv]
+          default: json
+          description: Output format for scan results
+
+    SamplingConfig:
+      type: object
+      properties:
+        maxDocumentsPerCollection:
+          type: integer
+          minimum: 1
+          maximum: 10000
+          default: 100
+          description: Maximum number of documents to sample per collection
+        piiDetectionEnabled:
+          type: boolean
+          default: true
+          description: Whether to enable PII detection and redaction
+        connectionTimeout:
+          type: integer
+          minimum: 1000
+          maximum: 300000
+          default: 30000
+          description: Connection timeout in milliseconds
+
+    ScanResponse:
+      type: object
+      required:
+        - scanId
+        - status
+        - message
+      properties:
+        scanId:
+          type: string
+          description: Unique identifier for the scan operation
+        status:
+          type: string
+          enum: [started, running, completed, failed]
+          description: Current status of the scan operation
+        message:
+          type: string
+          description: Human-readable status message
+        estimatedDuration:
+          type: integer
+          description: Estimated duration in seconds
+        repositories:
+          type: array
+          items:
+            type: string
+          description: List of repositories being scanned
+
+    ScanStatusResponse:
+      type: object
+      required:
+        - scanId
+        - status
+        - progress
+      properties:
+        scanId:
+          type: string
+          description: Unique identifier for the scan operation
+        status:
+          type: string
+          enum: [started, running, completed, failed, cancelled]
+          description: Current status of the scan operation
+        progress:
+          type: object
+          properties:
+            percentage:
+              type: number
+              minimum: 0
+              maximum: 100
+              description: Completion percentage
+            currentRepository:
+              type: string
+              description: Currently processing repository
+            processedRepositories:
+              type: integer
+              description: Number of repositories processed
+            totalRepositories:
+              type: integer
+              description: Total number of repositories to process
+        results:
+          $ref: '#/components/schemas/ScanResults'
+        error:
+          type: string
+          description: Error message if scan failed
+        startedAt:
+          type: string
+          format: date-time
+          description: When the scan started
+        completedAt:
+          type: string
+          format: date-time
+          description: When the scan completed
+
+    ScanResults:
+      type: object
+      properties:
+        typesDiscovered:
+          type: integer
+          description: Number of code types discovered
+        collectionsMapped:
+          type: integer
+          description: Number of collection mappings discovered
+        queriesExtracted:
+          type: integer
+          description: Number of query operations extracted
+        relationshipsInferred:
+          type: integer
+          description: Number of data relationships inferred
+        schemasObserved:
+          type: integer
+          description: Number of observed schemas generated
+        repositories:
+          type: array
+          items:
+            $ref: '#/components/schemas/RepositoryResult'
+          description: Results for each repository
+
+    RepositoryResult:
+      type: object
+      required:
+        - repository
+        - status
+      properties:
+        repository:
+          type: string
+          description: Repository path or URL
+        status:
+          type: string
+          enum: [success, skipped, failed]
+          description: Processing status for this repository
+        typesDiscovered:
+          type: integer
+          description: Number of types discovered in this repository
+        collectionsMapped:
+          type: integer
+          description: Number of collections mapped in this repository
+        queriesExtracted:
+          type: integer
+          description: Number of queries extracted from this repository
+        error:
+          type: string
+          description: Error message if processing failed
+
+    SearchRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query text
+        entityTypes:
+          type: array
+          items:
+            type: string
+            enum: [CodeType, CollectionMapping, QueryOperation, DataRelationship, ObservedSchema]
+          description: Filter by entity types
+        repositories:
+          type: array
+          items:
+            type: string
+          description: Filter by repositories
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 50
+          description: Maximum number of results to return
+        offset:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Number of results to skip
+
+    SearchResponse:
+      type: object
+      required:
+        - results
+        - total
+        - limit
+        - offset
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchResult'
+          description: Search results
+        total:
+          type: integer
+          description: Total number of matching results
+        limit:
+          type: integer
+          description: Maximum number of results returned
+        offset:
+          type: integer
+          description: Number of results skipped
+        query:
+          type: string
+          description: Original search query
+
+    SearchResult:
+      type: object
+      required:
+        - id
+        - entityType
+        - title
+        - description
+        - relevanceScore
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the entity
+        entityType:
+          type: string
+          enum: [CodeType, CollectionMapping, QueryOperation, DataRelationship, ObservedSchema]
+          description: Type of entity
+        title:
+          type: string
+          description: Display title for the result
+        description:
+          type: string
+          description: Brief description of the entity
+        relevanceScore:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Relevance score for the search query
+        repository:
+          type: string
+          description: Repository where this entity was found
+        filePath:
+          type: string
+          description: File path where this entity was found
+        lineNumber:
+          type: integer
+          description: Line number where this entity was found
+
+    TypeInfoResponse:
+      type: object
+      required:
+        - id
+        - name
+        - namespace
+        - fields
+        - provenance
+      properties:
+        id:
+          type: string
+          description: Unique identifier for the type
+        name:
+          type: string
+          description: Type name
+        namespace:
+          type: string
+          description: Full namespace
+        assembly:
+          type: string
+          description: Assembly name
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldInfo'
+          description: List of fields in the type
+        bsonAttributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BSONAttribute'
+          description: BSON attributes applied to the type
+        nullability:
+          type: object
+          description: Nullable reference type information
+        discriminators:
+          type: array
+          items:
+            type: string
+          description: Type discrimination information
+        collectionMappings:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionMapping'
+          description: MongoDB collection mappings for this type
+        queryOperations:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryOperation'
+          description: Query operations using this type
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/DataRelationship'
+          description: Relationships to other types
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    FieldInfo:
+      type: object
+      required:
+        - name
+        - type
+        - isNullable
+      properties:
+        name:
+          type: string
+          description: Field name
+        type:
+          type: string
+          description: Field type
+        isNullable:
+          type: boolean
+          description: Whether the field is nullable
+        bsonAttributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/BSONAttribute'
+          description: BSON attributes applied to this field
+
+    BSONAttribute:
+      type: object
+      required:
+        - name
+        - value
+      properties:
+        name:
+          type: string
+          description: Attribute name
+        value:
+          type: string
+          description: Attribute value
+        parameters:
+          type: object
+          description: Additional attribute parameters
+
+    CollectionMapping:
+      type: object
+      required:
+        - id
+        - collectionName
+        - resolutionMethod
+        - confidence
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        collectionName:
+          type: string
+          description: MongoDB collection name
+        resolutionMethod:
+          type: string
+          enum: [literal, constant, config, inferred]
+          description: How the collection name was resolved
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Resolution confidence score
+
+    QueryOperation:
+      type: object
+      required:
+        - id
+        - operationType
+        - collectionName
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        operationType:
+          type: string
+          enum: [Find, Update, Aggregate, Replace, Delete, Insert]
+          description: Type of MongoDB operation
+        collectionName:
+          type: string
+          description: Target collection name
+        filters:
+          type: object
+          description: Query filter expressions
+        projections:
+          type: object
+          description: Field projection specifications
+        sort:
+          type: object
+          description: Sort specifications
+        limit:
+          type: integer
+          description: Result limit
+        skip:
+          type: integer
+          description: Result skip count
+
+    DataRelationship:
+      type: object
+      required:
+        - id
+        - sourceType
+        - targetType
+        - relationshipType
+        - confidence
+      properties:
+        id:
+          type: string
+          description: Unique identifier
+        sourceType:
+          type: string
+          description: Source type name
+        targetType:
+          type: string
+          description: Target type name
+        relationshipType:
+          type: string
+          enum: [REFERS_TO, LOOKUP, EMBEDDED]
+          description: Type of relationship
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: Relationship confidence score
+        evidence:
+          type: string
+          description: Supporting evidence for the relationship
+
+    ProvenanceRecord:
+      type: object
+      required:
+        - repository
+        - filePath
+        - symbol
+        - lineSpan
+        - commitSHA
+        - timestamp
+      properties:
+        repository:
+          type: string
+          description: Repository name or URL
+        filePath:
+          type: string
+          description: File path within repository
+        symbol:
+          type: string
+          description: Symbol name
+        lineSpan:
+          type: object
+          properties:
+            start:
+              type: integer
+              description: Start line number
+            end:
+              type: integer
+              description: End line number
+          description: Line number range
+        commitSHA:
+          type: string
+          description: Git commit SHA
+        timestamp:
+          type: string
+          format: date-time
+          description: Extraction timestamp
+        extractorVersion:
+          type: string
+          description: Version of the extraction tool
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Error code
+        message:
+          type: string
+          description: Human-readable error message
+        details:
+          type: object
+          description: Additional error details
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred

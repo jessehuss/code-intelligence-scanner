@@ -1,0 +1,6 @@
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.csproj.AssemblyReference.cache
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.AssemblyInfoInputs.cache
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.AssemblyInfo.cs
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.csproj.CoreCompileInputs.cache
+C:\Users\jesse\Contracting\cataloger\apps\catalog-api\src\CatalogApi\obj\Debug\net8.0\CatalogApi.MvcApplicationPartsAssemblyInfo.cache
