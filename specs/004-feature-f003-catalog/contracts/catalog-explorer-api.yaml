@@ -1,0 +1,986 @@
+openapi: 3.0.3
+info:
+  title: Catalog Explorer API
+  description: API for the Catalog Explorer UI frontend application
+  version: 1.0.0
+  contact:
+    name: Catalog Explorer Team
+    email: team@catalog-explorer.com
+
+servers:
+  - url: http://localhost:3000/api
+    description: Development server
+  - url: https://catalog-explorer.example.com/api
+    description: Production server
+
+paths:
+  /search:
+    get:
+      summary: Global search across all entities
+      description: Search across Collections, Types, Fields, Queries, and Services with federated results
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query string
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 100
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: repo
+          in: query
+          description: Filter by repository
+          schema:
+            type: string
+        - name: service
+          in: query
+          description: Filter by service
+          schema:
+            type: string
+        - name: operation
+          in: query
+          description: Filter by operation type
+          schema:
+            type: string
+            enum: [FIND, INSERT, UPDATE, DELETE, AGGREGATE]
+        - name: changed_since
+          in: query
+          description: Filter by changes since date
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /collections/{name}:
+    get:
+      summary: Get collection details
+      description: Get detailed information about a specific collection
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: Collection name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Collection details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Collection'
+        '404':
+          description: Collection not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /types/{fqcn}:
+    get:
+      summary: Get type details
+      description: Get detailed information about a specific type
+      parameters:
+        - name: fqcn
+          in: path
+          required: true
+          description: Fully qualified class name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Type details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Type'
+        '404':
+          description: Type not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /graph:
+    get:
+      summary: Get graph data
+      description: Get graph data for visualization with optional filtering
+      parameters:
+        - name: node
+          in: query
+          description: Focus node ID
+          schema:
+            type: string
+        - name: edgeKinds
+          in: query
+          description: Comma-separated list of edge kinds to include
+          schema:
+            type: string
+        - name: depth
+          in: query
+          description: Graph depth limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+            default: 2
+      responses:
+        '200':
+          description: Graph data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GraphResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /query-helper:
+    post:
+      summary: Generate query examples
+      description: Generate Mongo shell and C# Builders<T> examples for a type/field path
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryHelperRequest'
+      responses:
+        '200':
+          description: Generated query examples
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryHelperResponse'
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    SearchResponse:
+      type: object
+      required:
+        - results
+        - pagination
+        - facets
+      properties:
+        results:
+          type: object
+          properties:
+            collections:
+              type: array
+              items:
+                $ref: '#/components/schemas/CollectionSummary'
+            types:
+              type: array
+              items:
+                $ref: '#/components/schemas/TypeSummary'
+            fields:
+              type: array
+              items:
+                $ref: '#/components/schemas/FieldSummary'
+            queries:
+              type: array
+              items:
+                $ref: '#/components/schemas/QuerySummary'
+            services:
+              type: array
+              items:
+                $ref: '#/components/schemas/ServiceSummary'
+        pagination:
+          $ref: '#/components/schemas/Pagination'
+        facets:
+          $ref: '#/components/schemas/Facets'
+
+    Collection:
+      type: object
+      required:
+        - id
+        - name
+        - declaredSchema
+        - observedSchema
+        - presenceMetrics
+        - driftIndicators
+        - types
+        - queries
+        - relationships
+        - provenance
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        declaredSchema:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaField'
+        observedSchema:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaField'
+        presenceMetrics:
+          $ref: '#/components/schemas/PresenceMetrics'
+        driftIndicators:
+          type: array
+          items:
+            $ref: '#/components/schemas/DriftIndicator'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeReference'
+        queries:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryReference'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    Type:
+      type: object
+      required:
+        - id
+        - name
+        - namespace
+        - fields
+        - attributes
+        - collections
+        - usages
+        - diffSummary
+        - relationships
+        - provenance
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        namespace:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/Field'
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attribute'
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionReference'
+        usages:
+          type: array
+          items:
+            $ref: '#/components/schemas/Usage'
+        diffSummary:
+          $ref: '#/components/schemas/DiffSummary'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    Field:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - isRequired
+        - attributes
+        - usagePatterns
+        - provenance
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        isRequired:
+          type: boolean
+        defaultValue:
+          type: string
+        attributes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Attribute'
+        usagePatterns:
+          type: array
+          items:
+            $ref: '#/components/schemas/UsagePattern'
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    Query:
+      type: object
+      required:
+        - id
+        - name
+        - operation
+        - codeSnippet
+        - language
+        - collections
+        - types
+        - relationships
+        - provenance
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        operation:
+          $ref: '#/components/schemas/QueryOperation'
+        codeSnippet:
+          type: string
+        language:
+          type: string
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionReference'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeReference'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    Service:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - collections
+        - types
+        - endpoints
+        - relationships
+        - provenance
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/ServiceType'
+        collections:
+          type: array
+          items:
+            $ref: '#/components/schemas/CollectionReference'
+        types:
+          type: array
+          items:
+            $ref: '#/components/schemas/TypeReference'
+        endpoints:
+          type: array
+          items:
+            $ref: '#/components/schemas/Endpoint'
+        relationships:
+          type: array
+          items:
+            $ref: '#/components/schemas/Relationship'
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    Relationship:
+      type: object
+      required:
+        - id
+        - sourceId
+        - targetId
+        - edgeKind
+        - weight
+        - metadata
+        - provenance
+      properties:
+        id:
+          type: string
+        sourceId:
+          type: string
+        targetId:
+          type: string
+        edgeKind:
+          $ref: '#/components/schemas/EdgeKind'
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+        metadata:
+          type: object
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    # Summary types for search results
+    CollectionSummary:
+      type: object
+      required:
+        - id
+        - name
+        - driftCount
+        - typeCount
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        driftCount:
+          type: integer
+        typeCount:
+          type: integer
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    TypeSummary:
+      type: object
+      required:
+        - id
+        - name
+        - namespace
+        - fieldCount
+        - usageCount
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        namespace:
+          type: string
+        fieldCount:
+          type: integer
+        usageCount:
+          type: integer
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    FieldSummary:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - isRequired
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        isRequired:
+          type: boolean
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    QuerySummary:
+      type: object
+      required:
+        - id
+        - name
+        - operation
+        - language
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        operation:
+          $ref: '#/components/schemas/QueryOperation'
+        language:
+          type: string
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    ServiceSummary:
+      type: object
+      required:
+        - id
+        - name
+        - type
+        - endpointCount
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: '#/components/schemas/ServiceType'
+        endpointCount:
+          type: integer
+        provenance:
+          $ref: '#/components/schemas/ProvenanceRecord'
+
+    # Supporting types
+    SchemaField:
+      type: object
+      required:
+        - name
+        - type
+        - isRequired
+        - isArray
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        isRequired:
+          type: boolean
+        isArray:
+          type: boolean
+        nestedFields:
+          type: array
+          items:
+            $ref: '#/components/schemas/SchemaField'
+
+    PresenceMetrics:
+      type: object
+      required:
+        - totalSamples
+        - presentSamples
+        - presencePercentage
+        - lastUpdated
+      properties:
+        totalSamples:
+          type: integer
+        presentSamples:
+          type: integer
+        presencePercentage:
+          type: number
+          minimum: 0
+          maximum: 100
+        lastUpdated:
+          type: string
+          format: date-time
+
+    DriftIndicator:
+      type: object
+      required:
+        - fieldName
+        - driftType
+        - severity
+        - description
+        - suggestedAction
+      properties:
+        fieldName:
+          type: string
+        driftType:
+          $ref: '#/components/schemas/DriftType'
+        severity:
+          $ref: '#/components/schemas/DriftSeverity'
+        description:
+          type: string
+        suggestedAction:
+          type: string
+
+    Attribute:
+      type: object
+      required:
+        - name
+        - value
+        - parameters
+      properties:
+        name:
+          type: string
+        value:
+          type: string
+        parameters:
+          type: object
+
+    Usage:
+      type: object
+      required:
+        - context
+        - frequency
+        - locations
+      properties:
+        context:
+          type: string
+        frequency:
+          type: integer
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/Location'
+
+    UsagePattern:
+      type: object
+      required:
+        - pattern
+        - frequency
+        - examples
+      properties:
+        pattern:
+          type: string
+        frequency:
+          type: integer
+        examples:
+          type: array
+          items:
+            type: string
+
+    DiffSummary:
+      type: object
+      required:
+        - fromSha
+        - toSha
+        - addedFields
+        - removedFields
+        - modifiedFields
+        - changeCount
+      properties:
+        fromSha:
+          type: string
+        toSha:
+          type: string
+        addedFields:
+          type: array
+          items:
+            $ref: '#/components/schemas/Field'
+        removedFields:
+          type: array
+          items:
+            $ref: '#/components/schemas/Field'
+        modifiedFields:
+          type: array
+          items:
+            $ref: '#/components/schemas/Field'
+        changeCount:
+          type: integer
+
+    ProvenanceRecord:
+      type: object
+      required:
+        - repository
+        - filePath
+        - lineNumber
+        - commitSha
+        - timestamp
+        - extractor
+      properties:
+        repository:
+          type: string
+        filePath:
+          type: string
+        lineNumber:
+          type: integer
+        commitSha:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        extractor:
+          type: string
+
+    Location:
+      type: object
+      required:
+        - filePath
+        - lineNumber
+      properties:
+        filePath:
+          type: string
+        lineNumber:
+          type: integer
+        context:
+          type: string
+
+    Endpoint:
+      type: object
+      required:
+        - path
+        - method
+        - description
+      properties:
+        path:
+          type: string
+        method:
+          type: string
+        description:
+          type: string
+        parameters:
+          type: array
+          items:
+            type: string
+
+    # Reference types
+    TypeReference:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    CollectionReference:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    QueryReference:
+      type: object
+      required:
+        - id
+        - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+
+    # Graph types
+    GraphResponse:
+      type: object
+      required:
+        - nodes
+        - edges
+        - metadata
+      properties:
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/GraphEdge'
+        metadata:
+          type: object
+
+    GraphNode:
+      type: object
+      required:
+        - id
+        - label
+        - type
+        - data
+      properties:
+        id:
+          type: string
+        label:
+          type: string
+        type:
+          type: string
+        data:
+          type: object
+
+    GraphEdge:
+      type: object
+      required:
+        - id
+        - source
+        - target
+        - label
+        - data
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        label:
+          type: string
+        data:
+          type: object
+
+    # Query helper types
+    QueryHelperRequest:
+      type: object
+      required:
+        - typePath
+        - fieldPath
+        - operation
+      properties:
+        typePath:
+          type: string
+        fieldPath:
+          type: string
+        operation:
+          $ref: '#/components/schemas/QueryOperation'
+
+    QueryHelperResponse:
+      type: object
+      required:
+        - mongoShell
+        - csharpBuilder
+      properties:
+        mongoShell:
+          type: string
+        csharpBuilder:
+          type: string
+
+    # Utility types
+    Pagination:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+    Facets:
+      type: object
+      properties:
+        repositories:
+          type: array
+          items:
+            type: string
+        services:
+          type: array
+          items:
+            type: string
+        operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/QueryOperation'
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+        - message
+        - timestamp
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        details:
+          type: object
+
+    # Enums
+    QueryOperation:
+      type: string
+      enum:
+        - FIND
+        - INSERT
+        - UPDATE
+        - DELETE
+        - AGGREGATE
+
+    ServiceType:
+      type: string
+      enum:
+        - API
+        - GRAPHQL
+        - GRPC
+        - BACKGROUND
+        - SCHEDULED
+
+    EdgeKind:
+      type: string
+      enum:
+        - USES
+        - CONTAINS
+        - REFERENCES
+        - IMPLEMENTS
+        - EXTENDS
+
+    DriftType:
+      type: string
+      enum:
+        - MISSING_FIELD
+        - EXTRA_FIELD
+        - TYPE_MISMATCH
+        - REQUIRED_MISMATCH
+
+    DriftSeverity:
+      type: string
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+        - CRITICAL
