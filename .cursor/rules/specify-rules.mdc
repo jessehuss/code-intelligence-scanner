@@ -6,6 +6,8 @@ Auto-generated from all feature plans. Last updated: 2025-10-02
 - .NET 8, C# 12 + Microsoft.CodeAnalysis.* (Roslyn), MongoDB.Driver, Microsoft.Extensions.* (001-feature-f001-code)
 - .NET 8 + C# + ASP.NET Core Minimal APIs, MongoDB.Driver, Atlas Search, Redis (002-feature-f002-catalog)
 - MongoDB "catalog_kb" database, Atlas Search for text queries, Redis for caching (002-feature-f002-catalog)
+- TypeScript 5.0+, Next.js 14+ (App Router) + Next.js, TypeScript, Tailwind CSS, shadcn/ui, SWR, Monaco Editor, Cytoscape.js (004-feature-f003-catalog)
+- N/A (consumes F002 Catalog API) (004-feature-f003-catalog)
 
 ## Project Structure
 ```
@@ -20,6 +22,7 @@ tests/
 .NET 8, C# 12: Follow standard conventions
 
 ## Recent Changes
+- 004-feature-f003-catalog: Added TypeScript 5.0+, Next.js 14+ (App Router) + Next.js, TypeScript, Tailwind CSS, shadcn/ui, SWR, Monaco Editor, Cytoscape.js
 - 002-feature-f002-catalog: Added .NET 8 + C# + ASP.NET Core Minimal APIs, MongoDB.Driver, Atlas Search, Redis
 - 001-feature-f001-code: Added .NET 8, C# 12 + Microsoft.CodeAnalysis.* (Roslyn), MongoDB.Driver, Microsoft.Extensions.*
 

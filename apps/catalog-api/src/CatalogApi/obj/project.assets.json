@@ -1446,23 +1446,23 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\jesse\\.nuget\\packages\\": {},
+    "C:\\Users\\Jesse.Huss\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\jesse\\Contracting\\cataloger\\apps\\catalog-api\\src\\CatalogApi\\CatalogApi.csproj",
+      "projectUniqueName": "C:\\Users\\Jesse.Huss\\Documents\\Upshop\\code-intelligence-scanner\\apps\\catalog-api\\src\\CatalogApi\\CatalogApi.csproj",
       "projectName": "CatalogApi",
-      "projectPath": "C:\\Users\\jesse\\Contracting\\cataloger\\apps\\catalog-api\\src\\CatalogApi\\CatalogApi.csproj",
-      "packagesPath": "C:\\Users\\jesse\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\jesse\\Contracting\\cataloger\\apps\\catalog-api\\src\\CatalogApi\\obj\\",
+      "projectPath": "C:\\Users\\Jesse.Huss\\Documents\\Upshop\\code-intelligence-scanner\\apps\\catalog-api\\src\\CatalogApi\\CatalogApi.csproj",
+      "packagesPath": "C:\\Users\\Jesse.Huss\\.nuget\\packages\\",
+      "outputPath": "C:\\Users\\Jesse.Huss\\Documents\\Upshop\\code-intelligence-scanner\\apps\\catalog-api\\src\\CatalogApi\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
       ],
       "configFilePaths": [
-        "C:\\Users\\jesse\\AppData\\Roaming\\NuGet\\NuGet.Config",
+        "C:\\Users\\Jesse.Huss\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
@@ -1471,7 +1471,7 @@
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
-        "https://api.nuget.org/v3/index.json": {}
+        "https://applieddatacorp.pkgs.visualstudio.com/_packaging/heisenbergfeed/nuget/v3/index.json": {}
       },
       "frameworks": {
         "net8.0": {
@@ -1527,7 +1527,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.300/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.305/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
